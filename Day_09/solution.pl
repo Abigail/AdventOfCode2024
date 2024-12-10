@@ -23,114 +23,93 @@ my $HEAD = 0;
 my $TAIL = -1;
 
 
-sub sum (@map) {
-    my ($pos, $sum) = (0, 0);
-    foreach my $file (@map) {
-        $sum += $pos ++ * $$file [$ID] for 1 .. $$file [$LEN];
-    }
-    return $sum;
-}
-
-
 #
 # Read in the input. Store the blocks as 3-tuples:
 #    * Its type ($FILE or $FREE)
 #    * Its length
 #    * Its id (use 0 for free blocks)
-# Copy this for part 2
 #
-my @map  = <> =~ /./g;
-my @map2 = map {[@$_]}
-my @map1 = map {$_  % 2 ? [$FREE => $map [$_], 0]
-                        : [$FILE => $map [$_], int ($_ / 2)]} keys @map;
+my @input  = <> =~ /./g;
+my ($sum, $pos);
 
+foreach my $part (1, 2) {
+    my @map = map {$_  % 2 ? [$FREE => $input [$_], 0]
+                           : [$FILE => $input [$_], int ($_ / 2)]} keys @input;
+    $sum = $pos = 0;
+    sub add_score ($blk) {$sum += $pos ++ * $$blk [$ID] for 1 .. $$blk [$LEN];}
 
-#
-# Part 1: fill in the blanks, creating a new layout. 
-#
-my @new_map1;
-while (@map1) {
-    #
-    # Remove trailing free space
-    #
-    if ($map1 [$TAIL] [$TYPE] == $FREE) {pop @map1; next}
-    #
-    # Discard any zero blocks
-    #
-    if ($map1 [$HEAD] [$LEN] == 0) {shift @map1; next}
-    #
-    # Copy leading files
-    #
-    if ($map1 [$HEAD] [$TYPE] == $FILE) {push @new_map1 => shift @map1; next}
-    #
-    # Now, we have free space. Fill in the space, considering two cases
-    #
-    if ($map1 [$HEAD] [$LEN] >= $map1 [$TAIL] [$LEN]) {
+  MAP:
+    while (@map) {
         #
-        # We can fit the entire file. Update the free space, copy the file
+        # Remove trailing free space
         #
-        $map1 [$HEAD] [$LEN] -= $map1 [$TAIL] [$LEN];
-        push @new_map1 => pop @map1;
+        if ($map [$TAIL] [$TYPE] == $FREE) {pop @map; next}
+        #
+        # Discard any leading zero blocks
+        #
+        if ($map [$HEAD] [$LEN] == 0) {shift @map; next}
+        #
+        # A leading file stays that way in the final disk map, so
+        # we can add it to the score.
+        #
+        if ($map [$HEAD] [$TYPE] == $FILE) {add_score shift @map; next}
+
+        #
+        # Now, we have leading free space. How we deal with that, depends on 
+        # the part of the puzzle we're solving.
+        #
+        if ($part == 1) {
+            if ($map [$HEAD] [$LEN] >= $map [$TAIL] [$LEN]) {
+                #
+                # We can fit the entire file. Update the free space, 
+                # calculate the score of the file, which will be
+                # removed.
+                #
+                $map [$HEAD] [$LEN] -= $map [$TAIL] [$LEN];
+                add_score pop @map;
+            }
+            else {
+                #
+                # Only a partial fit. Discard leading free space. Update
+                # the length of the file at the end. Update the score using
+                # the part of the file that fits the space.
+                #
+                add_score [$FILE => $map [$HEAD] [$LEN], $map [$TAIL] [$ID]];
+                $map [$TAIL] [$LEN] -= $map [$HEAD] [$LEN];
+                shift @map;
+            }
+        }
+        else {
+            #
+            # Find the last file which will fit
+            #
+            for (my $i = @map - 1; $i >= 0; $i --) {
+                next if $map [$i] [$TYPE] == $FREE ||
+                        $map [$i] [$LEN] > $map [$HEAD] [$LEN];
+                #
+                # Now we have a file which fits. Add it to the score, turn it
+                # to free space on the map, and reduce the leading free space.
+                #
+                add_score $map [$i];
+
+                #
+                # Reduce free block size
+                #
+                $map [$HEAD] [$LEN] -= $map [$i] [$LEN];
+
+                #
+                # Make the copied block free; hence its ID will be 0
+                #
+                $map [$i] [$TYPE] = $FREE;
+                $map [$i] [$ID]   = 0;
+
+                next MAP;
+            }
+            #
+            # Could not find a file to fit, score the free block.
+            #
+            add_score shift @map;
+        }
     }
-    else {
-        #
-        # Only a partial file. Discard leading free space. Update
-        # the length of the file at the end. Create a new file at
-        # the new map
-        #
-        push @new_map1 => [$FILE => $map1 [$HEAD] [$LEN], $map1 [$TAIL] [$ID]];
-        $map1 [$TAIL] [$LEN] -= $map1 [$HEAD] [$LEN];
-        shift @map1;
-    }
+    say "Solution $part: $sum"
 }
-
-#
-# Part 2: fill in the blanks as well; this time, in situ
-#
-my @new_map2;
-MAP2: while (@map2) {
-    #
-    # Get rid of leading 0 length blocks
-    #
-    if ($map2 [$HEAD] [$LEN] == 0) {shift @map2; next;}
-    #
-    # Copy leading files
-    #
-    if ($map2 [$HEAD] [$TYPE] == $FILE) {push @new_map2 => shift @map2; next}
-    #
-    # If the leading block is free space, find the last file in @map2 which fits
-    #
-    for (my $i = @map2 - 1; $i >= 0; $i --) {
-        next if $map2 [$i] [$TYPE] == $FREE ||
-                $map2 [$i] [$LEN] > $map2 [$HEAD] [$LEN];
-        #
-        # Now we have a file which fits. Copy to the new map, turn in
-        # to free space in the map, collapsing freespace into one, if any,
-        # and reduce the leading free space.
-        #
-        push @new_map2 => [@{$map2 [$i]}];  # Copy!
-
-        #
-        # Reduce free block size
-        #
-        $map2 [$HEAD] [$LEN] -= $map2 [$i] [$LEN];
-
-        #
-        # Make the copied block free; hence its ID will be 0
-        #
-        $map2 [$i] [$TYPE] = $FREE;
-        $map2 [$i] [$ID]   = 0;
-
-        next MAP2;
-    }
-    #
-    # Could not find a file to fit, copy free blocks.
-    #
-    push @new_map2 => shift @map2;
-}
-
-$solution_1 = sum @new_map1;
-$solution_2 = sum @new_map2;
-
-say "Solution 1: $solution_1";
-say "Solution 2: $solution_2";
