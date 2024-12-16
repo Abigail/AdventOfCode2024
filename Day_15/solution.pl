@@ -28,7 +28,8 @@ sub score ($map) {
     my $score = 0;
     for (my $x = 0; $x < @$map; $x ++) {
         for (my $y = 0; $y < @{$$map [$x]}; $y ++) {
-            $score += 100 * $x + $y if $$map [$x] [$y] eq 'O' || $$map [$x] [$y] eq '[';
+            $score += 100 * $x + $y if $$map [$x] [$y] eq 'O' ||
+                                       $$map [$x] [$y] eq '[';
         }
     }
     $score;
@@ -68,51 +69,31 @@ sub move ($map, $command, $pos_x, $pos_y) {
                         : $command eq '^' ? (-1,  0)
                         : $command eq 'v' ? ( 1,  0)
                         : die "Unexpected command '$command'";
-    my @front;  # Cells which should not be walls. If they are all empty, we can move.
+    my @front;  # Cells which should not be walls. If they are all empty,
+                # we can move.
     my @blocks; # Blocks which need to be moved a single space.
 
     @front = ([$pos_x + $dir_x, $pos_y + $dir_y]);  # Initially, just one cell.
 
-    while (1) {
-        #
-        # Process front. If any cell in the front is a wall, we cannot move.
-        # Any block in the front becomes part of the new front. If there are
-        # no blocks in the front, we can move (exit the loop).
-        #
-        my @new_front;
-        my %done;
-        while (@front) {
-            my $cell = shift @front;
-            my ($x, $y) = @$cell;
-            next if $done {$x} {$y} ++;
-            my $val = $$map [$x] [$y];
-            if ($val eq '#') {
-                return ($map, $pos_x, $pos_y);
-                print "\n";
-            }
-            unless ($val eq '.') {
-                push @blocks    => [$x,          $y];
-                push @new_front => [$x + $dir_x, $y + $dir_y];
-            }
-
-            #
-            # If we're pushing vertically, and we're pushing on half a block,
-            # we need to consider the other half as well.
-            #
-            if ($dir_y == 0) {
-                push @front => [$x, $y - 1] if $val eq ']';
-                push @front => [$x, $y + 1] if $val eq '[';
-            }
+    my %done;
+    while (@front) {
+        my ($x, $y) = @{shift @front};
+        next if $done {$x} {$y} ++;
+        my $val = $$map [$x] [$y];
+        return ($map, $pos_x, $pos_y) if $val eq '#';
+        unless ($val eq '.') {
+            push @blocks => [$x,          $y];
+            push @front  => [$x + $dir_x, $y + $dir_y];
         }
-        #
-        # If the new front is empty, we can move.
-        #
-        last unless @new_front;
 
         #
-        # We've finished calculating the new front.
+        # If we're pushing vertically, and we're pushing on half a block,
+        # we need to consider the other half as well.
         #
-        @front = @new_front;
+        if ($dir_y == 0) {
+            unshift @front => [$x, $y - 1] if $val eq ']';
+            unshift @front => [$x, $y + 1] if $val eq '[';
+        }
     }
 
     #
