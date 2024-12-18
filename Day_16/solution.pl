@@ -26,10 +26,12 @@ for (my $x = 1; $x < @$map - 1; $x ++) {
 }
  
 #
-# Use Dijkstra to find the cheapest path from start to finish, while keeping track of 
-# all the possible cells visited to reach a certain point in the cheapest way.
+# Use Dijkstra to find the cheapest path from start to finish, while keeping
+# track of all the possible cells visited to reach a certain point in the
+# cheapest way.
 #
-my @heads = ([$sx, $sy, 0, 1, 0, 0, 0, 0, 0]);  # $x, $y, $dx, $dy, $score, $px, $py, $pdx, $pdy
+#             $x,  $y,  $dx, $dy, $score, $px, $py, $pdx, $pdy
+my @heads = ([$sx, $sy, 0,   1,   0,      0,   0,   0,    0]);
 my %best;  # {$x, $y, $dx, $dy -> [$score, $cells]}
 $best {$sx, $sy, 0, 0} = [0, {}];
 my $end_score;
@@ -39,9 +41,8 @@ while (@heads) {
     last if $end_score && $score > $end_score; 
     next if $val eq '#';   # Cannot continue through a wall
 
-    my $next = 0;
     my $cell_score = $best {$x, $y, $dx, $dy} [0] || 0;
-    next if $cell_score && $score > $cell_score;  # We already found a better path.
+    next if $cell_score && $score > $cell_score;  # Found a better path.
     $best {$x, $y, $dx, $dy} [0] ||= $score;
     $best {$x, $y, $dx, $dy} [1] ||= {};
     #
@@ -55,7 +56,7 @@ while (@heads) {
     #
     $best {$x, $y, $dx, $dy} [1] {$x, $y, $dx, $dy} ++;
 
-    $end_score ||= $score if $val eq 'E';
+    $end_score = $score, next if $val eq 'E';  # Reached the end
     next if $score && $score == $cell_score;
 
     #
@@ -64,11 +65,11 @@ while (@heads) {
     #   - Turn clockwise, increase the score by 1000
     #   - Turn counterclockwise, increase the score by 1000
     #
-    push @heads => [$x + $dx, $y + $dy,  $dx,  $dy, $score + 1,    $x, $y, $dx, $dy],
-                   [$x,       $y,        $dy, -$dx, $score + 1000, $x, $y, $dx, $dy],
-                   [$x,       $y,       -$dy,  $dx, $score + 1000, $x, $y, $dx, $dy];
+    @heads = sort {$$a [4] <=> $$b [4]} @heads,
+         [$x + $dx, $y + $dy,  $dx,  $dy, $score + 1,    $x, $y, $dx, $dy],
+         [$x,       $y,        $dy, -$dx, $score + 1000, $x, $y, $dx, $dy],
+         [$x,       $y,       -$dy,  $dx, $score + 1000, $x, $y, $dx, $dy];
 
-    @heads = sort {$$a [4] <=> $$b [4]} @heads;
 }
 
 my %cells;
